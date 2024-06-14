@@ -1,7 +1,6 @@
 import click
 from utils import (
     check_camera_port,
-    record_face,
     message,
     load_config,
     save_config,
@@ -9,7 +8,14 @@ from utils import (
 )
 import os
 from recognition import begin
-DEFAULT_CONFIG: Config = {"camera_id": 0, "image_path": "./images"}
+
+DEFAULT_CONFIG: Config = {
+    "camera_id": 0,
+    "image_path": "./images",
+    "alert_phone_number": "",  
+    "alert_cooldown": 300,  
+    "unknown_threshold": 3,
+}
 
 
 @click.group()
@@ -83,6 +89,11 @@ to detect and alert homeowners about human presence in a designated security zon
                 break
             else:
                 message("Invalid directory. Please try again.", "error")
+        message("Enter the phone number to receive alerts (with country code, e.g., +1234567890): ", "info")
+        config["alert_phone_number"] = click.prompt("Phone Number", default="")
+
+        config["alert_cooldown"] = click.prompt("Alert cooldown (in seconds)", type=int, default=300)
+        config["unknown_threshold"] = click.prompt("Number of consecutive unknown detections before alerting", type=int, default=3)
         message("Saving config...", "info")
         save_config(config)
         message("Configuration complete!", "success")
@@ -102,7 +113,6 @@ def start():
     message("Starting Secure Home system...", "title")
     message(f"Using camera ID: {config['camera_id']}", "info")
     message(f"Acceptable faces directory: {config['image_path']}", "info")
-    # TODO: Implement the main security system logic here
     begin(config)
 
 

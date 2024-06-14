@@ -1,16 +1,32 @@
+import os
 import json
 import cv2
 from typing import Literal, TypedDict
 from colorama import Fore, Back, Style, init
+from dotenv import load_dotenv
+from twilio.rest import Client
 
+load_dotenv()
 
+TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 # Initialize colorama for Windows support
 init(autoreset=True)
+
+client = Client(TWILIO_SID, TWILIIO_AUTH_TOKEN)
 
 
 class Config(TypedDict):
     camera_id: int
     image_path: str
+    alert_phone_number: str  # The phone number to send alerts to
+    alert_cooldown: (
+        int  # Time in seconds before sending another alert (e.g., 5 minutes)
+    )
+    unknown_threshold: (
+        int  # Number of consecutive unknown detections before sending an alert
+    )
 
 
 def hex2Scalar(hex: str):
@@ -118,3 +134,16 @@ def load_config() -> Config | None:
             return json.loads(f.read())
     except FileNotFoundError:
         return None
+
+
+def send_intruder_alert(user_number: str):
+    try:
+        m = client.messages.create(
+            body="Intruder Alert! Someone is trying to break into your house.",
+            from_=TWILIO_PHONE_NUMBER,
+            to=user_number,
+        )
+        return m.status
+    except Exception as e:
+        message(f"Failed to send alert: {e}", "error")
+        return "Failed"

@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import face_recognition
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from utils import Config, hex2Scalar,message
+from utils import Config, hex2Scalar,message,send_intruder_alert
 
 
 def begin(config: Config):
@@ -33,6 +33,11 @@ def begin(config: Config):
         return
 
     message("Surveillance is active. Press 'q' to quit.", "info")
+
+    last_alert_time = datetime.min  # Initialize to a time in the past
+    unknown_count = 0
+    last_detected_name = None
+
     while True:
         success, img = video_cap.read()
         if not success:
@@ -42,22 +47,39 @@ def begin(config: Config):
         # Face location in current frame
         face_locations = face_recognition.face_locations(small_img)
         face_encodings = face_recognition.face_encodings(small_img, face_locations)
-
+        current_detected_names = []
         for location, encoding in zip(face_locations, face_encodings):
             matches = face_recognition.compare_faces(usersEncodings, encoding)
             face_distances = face_recognition.face_distance(usersEncodings, encoding)
             match_idx = np.argmin(face_distances)
-
             if matches[match_idx]:
                 user_name = user_names[match_idx].capitalize()
-                location = tuple(map(lambda x: x * 4, location))
-                show_bounding_box(img, location, user_name)
                 log_detection(user_name)
+                unknown_count = 0  # Reset unknown count when a known face is detected
             else:
                 user_name = "Unknown"
-                location = tuple(map(lambda x: x * 4, location))
-                show_bounding_box(img, location, user_name, recognized=False)
+                unknown_count += 1
                 log_detection(user_name)
+            current_detected_names.append(user_name)
+            location = tuple(map(lambda x: x * 4, location))
+            show_bounding_box(img, location, user_name, recognized=(user_name != "Unknown"))
+            log_detection(user_name)
+            # Check if we should send an alert
+            if "Unknown" in current_detected_names:
+                if unknown_count >= config[
+                    "unknown_threshold"
+                ] and datetime.now() - last_alert_time > timedelta(
+                    seconds=config["alert_cooldown"]
+                ):
+                    message("Sending intruder alert...", "warning")
+                    alert_status = send_intruder_alert(config["alert_phone_number"])
+                    message(f"Alert sent. Status: {alert_status}", "info")
+                    last_alert_time = datetime.now()
+                    unknown_count = 0  # Reset the count after sending an alert
+            # If no faces are detected, or all detected faces are known, reset the unknown count
+            if not current_detected_names or "Unknown" not in current_detected_names:
+                unknown_count = 0
+
         cv2.imshow("Surveillance", img)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
