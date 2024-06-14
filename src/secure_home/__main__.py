@@ -20,13 +20,14 @@ DEFAULT_CONFIG: Config = {
 
 @click.group()
 def cli():
+    """Secure Home: A real-time home surveillance system."""
     pass
 
 
 @cli.command()
 @click.option("--reset", is_flag=True, help="Reset the existing configuration.")
 def init(reset):
-
+    """Initialize the Secure Home system."""
     message("Welcome to Secure Home!!!", "title")
     message(
         """an object detection system that utilizes cameras placed at home entrances 
